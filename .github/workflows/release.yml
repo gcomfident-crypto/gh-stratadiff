@@ -1,0 +1,275 @@
+name: Promote verified StrataDiff release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate tags and prepare draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ steps.metadata.outputs.commit }}
+      upstream_commit: ${{ steps.metadata.outputs.upstream_commit }}
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate extension and immutable upstream release
+        id: metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          release_commit="$(git rev-parse --verify HEAD^{commit})"
+          version="$(scripts/check-release-tag.sh "${RELEASE_TAG}" "${release_commit}")"
+          upstream_state="$(
+            gh release view "${RELEASE_TAG}" \
+              --repo github.com/gcomfident-crypto/stratadiff \
+              --json tagName,isDraft,isPrerelease,isImmutable \
+              --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring) + "\t" + (.isImmutable | tostring)'
+          )"
+          [[ "${upstream_state}" == "${RELEASE_TAG}"$'\tfalse\tfalse\ttrue' ]]
+          upstream_commit="$(
+            scripts/resolve-tag.sh gcomfident-crypto/stratadiff "${RELEASE_TAG}"
+          )"
+          printf 'commit=%s\n' "${release_commit}" >> "${GITHUB_OUTPUT}"
+          printf 'upstream_commit=%s\n' "${upstream_commit}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+      - name: Create or validate draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          UPSTREAM_COMMIT: ${{ steps.metadata.outputs.upstream_commit }}
+        run: |
+          if gh release view "${RELEASE_TAG}" --json isDraft >/dev/null 2>&1; then
+            is_draft="$(gh release view "${RELEASE_TAG}" --json isDraft --jq .isDraft)"
+            [[ "${is_draft}" == true ]] || {
+              echo "release ${RELEASE_TAG} is already published; refusing replacement" >&2
+              exit 1
+            }
+          else
+            gh release create "${RELEASE_TAG}" \
+              --verify-tag \
+              --draft \
+              --title "gh-stratadiff ${RELEASE_TAG}" \
+              --notes "Verified GitHub CLI packaging of gcomfident-crypto/stratadiff@${UPSTREAM_COMMIT}."
+          fi
+
+  promote-attest-upload:
+    name: Promote · ${{ matrix.asset }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            asset: gh-stratadiff-linux-amd64
+          - runner: ubuntu-24.04-arm
+            asset: gh-stratadiff-linux-arm64
+          - runner: macos-15-intel
+            asset: gh-stratadiff-darwin-amd64
+          - runner: macos-15
+            asset: gh-stratadiff-darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify checked-out extension commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: test "$(git rev-parse --verify HEAD^{commit})" = "${RELEASE_COMMIT}"
+      - name: Promote verified upstream bytes
+        id: package
+        env:
+          ASSET_NAME: ${{ matrix.asset }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir dist
+          scripts/promote-upstream-release.sh \
+            "${RELEASE_TAG}" "${PWD}/dist" "${ASSET_NAME}"
+          digest="$(awk '{print $1}' "dist/${ASSET_NAME}.sha256")"
+          printf 'digest=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
+      - name: Attest exact extension asset
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ matrix.asset }}
+          subject-digest: sha256:${{ steps.package.outputs.digest }}
+      - name: Verify generated provenance bundle
+        env:
+          ASSET_NAME: ${{ matrix.asset }}
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cp "${ATTESTATION_BUNDLE}" "dist/${ASSET_NAME}.intoto.jsonl"
+          gh attestation verify "dist/${ASSET_NAME}" \
+            --hostname github.com \
+            --bundle "dist/${ASSET_NAME}.intoto.jsonl" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --source-ref "refs/tags/${RELEASE_TAG}" \
+            --source-digest "${RELEASE_COMMIT}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml" \
+            --deny-self-hosted-runners >/dev/null
+      - name: Upload exact verified files
+        env:
+          ASSET_NAME: ${{ matrix.asset }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release upload "${RELEASE_TAG}" \
+            "dist/${ASSET_NAME}" \
+            "dist/${ASSET_NAME}.sha256" \
+            "dist/${ASSET_NAME}.intoto.jsonl" \
+            --clobber
+
+  verify-and-publish:
+    name: Verify inventory and publish immutable release
+    needs: [prepare, promote-attest-upload]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download and verify every draft asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release-assets
+          gh release download "${RELEASE_TAG}" --dir release-assets
+          scripts/verify-release-assets.sh \
+            release-assets \
+            "${GITHUB_REPOSITORY}" \
+            "refs/tags/${RELEASE_TAG}" \
+            "${RELEASE_COMMIT}" \
+            "${GITHUB_REPOSITORY}/.github/workflows/release.yml"
+      - name: Revalidate both source identities and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          UPSTREAM_COMMIT: ${{ needs.prepare.outputs.upstream_commit }}
+        run: |
+          remote_commit="$(
+            scripts/resolve-tag.sh "${GITHUB_REPOSITORY}" "${RELEASE_TAG}"
+          )"
+          [[ "${remote_commit}" == "${RELEASE_COMMIT}" ]]
+          current_upstream_commit="$(
+            scripts/resolve-tag.sh gcomfident-crypto/stratadiff "${RELEASE_TAG}"
+          )"
+          [[ "${current_upstream_commit}" == "${UPSTREAM_COMMIT}" ]]
+          upstream_state="$(
+            gh release view "${RELEASE_TAG}" \
+              --repo github.com/gcomfident-crypto/stratadiff \
+              --json tagName,isDraft,isPrerelease,isImmutable \
+              --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring) + "\t" + (.isImmutable | tostring)'
+          )"
+          [[ "${upstream_state}" == "${RELEASE_TAG}"$'\tfalse\tfalse\ttrue' ]]
+          gh release edit "${RELEASE_TAG}" --draft=false
+          release_state="$(
+            gh release view "${RELEASE_TAG}" \
+              --json tagName,isDraft,isPrerelease,isImmutable \
+              --jq '.tagName + "\t" + (.isDraft | tostring) + "\t" + (.isPrerelease | tostring) + "\t" + (.isImmutable | tostring)'
+          )"
+          if [[ "${release_state}" != "${RELEASE_TAG}"$'\tfalse\tfalse\ttrue' ]]; then
+            gh release delete "${RELEASE_TAG}" --yes || true
+            echo "GitHub did not make ${RELEASE_TAG} immutable" >&2
+            exit 1
+          fi
+          gh release verify "${RELEASE_TAG}" -R "${GITHUB_REPOSITORY}" >/dev/null
+          for asset in release-assets/gh-stratadiff-{darwin,linux}-{amd64,arm64}; do
+            gh release verify-asset "${RELEASE_TAG}" "${asset}" \
+              -R "${GITHUB_REPOSITORY}" >/dev/null
+          done
+          gh release edit "${RELEASE_TAG}" --latest
+
+  clean-install-smoke:
+    name: Clean install and upgrade · ${{ matrix.platform }}
+    needs: [prepare, verify-and-publish]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64
+          - runner: macos-15-intel
+            platform: darwin-amd64
+          - runner: macos-15
+            platform: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Install and run the published extension
+        env:
+          GH_CONFIG_DIR: ${{ runner.temp }}/gh-config
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          XDG_DATA_HOME: ${{ runner.temp }}/xdg-data
+          XDG_STATE_HOME: ${{ runner.temp }}/xdg-state
+        run: |
+          gh extension install "${GITHUB_REPOSITORY}"
+          test "$(gh stratadiff --version)" = "stratadiff ${RELEASE_VERSION}"
+          gh stratadiff inbox --help >/dev/null
+          gh stratadiff resume --help >/dev/null
+          gh extension remove stratadiff
+      - name: Upgrade from the preceding immutable release when one exists
+        env:
+          GH_CONFIG_DIR: ${{ runner.temp }}/gh-config
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          XDG_DATA_HOME: ${{ runner.temp }}/xdg-data
+          XDG_STATE_HOME: ${{ runner.temp }}/xdg-state
+        run: |
+          previous_tag="$(
+            gh release list \
+              -R "${GITHUB_REPOSITORY}" \
+              --exclude-drafts \
+              --exclude-pre-releases \
+              --limit 100 \
+              --json tagName,isImmutable \
+              --jq ".[] | select(.tagName != \"${RELEASE_TAG}\" and .isImmutable == true) | .tagName" |
+              head -n 1
+          )"
+          if [[ -z "${previous_tag}" ]]; then
+            echo "No preceding extension release exists; upgrade transition is not applicable."
+            exit 0
+          fi
+          gh extension install "${GITHUB_REPOSITORY}" --pin "${previous_tag}"
+          test "$(gh stratadiff --version)" = "stratadiff ${previous_tag#v}"
+          gh extension upgrade stratadiff --force
+          test "$(gh stratadiff --version)" = "stratadiff ${RELEASE_VERSION}"
+          gh stratadiff inbox --help >/dev/null
+          gh stratadiff resume --help >/dev/null

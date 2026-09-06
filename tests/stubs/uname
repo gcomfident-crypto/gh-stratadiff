@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  -s) printf '%s\n' "${GH_STRATADIFF_TEST_KERNEL}" ;;
+  -m) printf '%s\n' "${GH_STRATADIFF_TEST_MACHINE}" ;;
+  *) printf 'unsupported uname invocation\n' >&2; exit 2 ;;
+esac
