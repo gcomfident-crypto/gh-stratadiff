@@ -82,7 +82,7 @@ gh extension upgrade stratadiff
 Install a specific immutable version when reproducibility matters:
 
 ```console
-gh extension install gcomfident-crypto/gh-stratadiff --pin v0.4.0
+gh extension install gcomfident-crypto/gh-stratadiff --pin v0.4.1
 ```
 
 GitHub CLI intentionally does not upgrade pinned extensions. Remove and reinstall without `--pin`

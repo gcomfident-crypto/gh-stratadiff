@@ -70,6 +70,34 @@ run_platform_case Linux aarch64 gh-stratadiff-linux-arm64
 run_platform_case Darwin x86_64 gh-stratadiff-darwin-amd64
 run_platform_case Darwin arm64 gh-stratadiff-darwin-arm64
 
+trailing_tmp_parent=${temporary_directory}/trailing-tmp
+mkdir "${trailing_tmp_parent}"
+reset_scenario success Darwin arm64
+TMPDIR="${trailing_tmp_parent}/" \
+  "${repository_root}/scripts/promote-upstream-release.sh" v0.4.0 \
+  "${temporary_directory}/trailing-tmp-output" gh-stratadiff-darwin-arm64 >/dev/null
+installer_directory="$(
+  grep '^installer-directory=' "${GH_STRATADIFF_TEST_LOG}"
+)"
+installer_directory=${installer_directory#installer-directory=}
+[[ "${installer_directory}" != *//* ]] || \
+  fail 'trailing-slash TMPDIR reached the upstream installer as a non-normalized path'
+
+real_tmp_parent=${temporary_directory}/real-tmp
+linked_tmp_parent=${temporary_directory}/linked-tmp
+mkdir "${real_tmp_parent}"
+ln -s "${real_tmp_parent}" "${linked_tmp_parent}"
+reset_scenario success Darwin x86_64
+TMPDIR="${linked_tmp_parent}/" \
+  "${repository_root}/scripts/promote-upstream-release.sh" v0.4.0 \
+  "${temporary_directory}/linked-tmp-output" gh-stratadiff-darwin-amd64 >/dev/null
+installer_directory="$(
+  grep '^installer-directory=' "${GH_STRATADIFF_TEST_LOG}"
+)"
+installer_directory=${installer_directory#installer-directory=}
+[[ "${installer_directory}" == "${real_tmp_parent}/"* ]] || \
+  fail 'symlink TMPDIR was not resolved before invoking the upstream installer'
+
 reset_scenario mutable-release Linux x86_64
 expect_failure mutable-release \
   "${repository_root}/scripts/promote-upstream-release.sh" v0.4.0 \

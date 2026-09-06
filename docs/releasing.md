@@ -28,8 +28,8 @@ From a clean checkout of the intended extension commit:
 ```console
 scripts/ci.sh
 scripts/check-repository-policy.sh
-git tag -a v0.4.0 -m "gh-stratadiff v0.4.0"
-git push origin v0.4.0
+git tag -a v0.4.1 -m "gh-stratadiff v0.4.1"
+git push origin v0.4.1
 ```
 
 Use the actual upstream version instead of copying the example. The release workflow:

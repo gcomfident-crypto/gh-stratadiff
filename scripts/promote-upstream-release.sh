@@ -69,7 +69,9 @@ release_state="$(
 
 source_commit="$("${script_directory}/resolve-tag.sh" "${upstream_repository}" "${release_tag}")"
 
-temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/gh-stratadiff-promote-XXXXXX")"
+temporary_directory="$(
+  cd -- "$(mktemp -d "${TMPDIR:-/tmp}/gh-stratadiff-promote-XXXXXX")" && pwd -P
+)"
 staged_output=
 cleanup() {
   if [[ -n "${staged_output}" ]]; then
