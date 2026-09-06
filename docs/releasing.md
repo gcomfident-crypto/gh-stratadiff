@@ -13,9 +13,9 @@ tagged.
 4. Add the topics `gh-extension`, `code-review`, `pull-request`, `rebase`, `force-push`, and
    `stacked-pr`.
 
-The local repository-policy gate requires an authenticated identity with repository Administration
-write access. GitHub omits sensitive ruleset fields for insufficiently privileged callers, and a
-missing `bypass_actors` field fails closed:
+The local repository-policy gate requires Python 3 and an authenticated identity with repository
+Administration write access. GitHub omits sensitive ruleset fields for insufficiently privileged
+callers; missing, null, or nonempty `bypass_actors` all fail closed:
 
 ```console
 scripts/check-repository-policy.sh

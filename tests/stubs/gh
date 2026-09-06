@@ -88,19 +88,24 @@ case "${command_name}" in
         esac
         ;;
       repos/gcomfident-crypto/gh-stratadiff/rulesets/42)
-        if [[ "${scenario}" == missing-bypass-actors ]]; then
-          if [[ "${jq_filter}" == *'has("bypass_actors")'* && \
-                "${jq_filter}" == *'((.bypass_actors | type) == "array")'* && \
-                "${jq_filter}" == *'(.bypass_actors == [])'* ]]; then
-            printf 'false\n'
-          else
-            printf 'true\n'
-          fi
-        elif [[ "${scenario}" == invalid-ruleset ]]; then
-          printf 'false\n'
-        else
-          printf 'true\n'
-        fi
+        [[ -z "${jq_filter}" ]] || exit 2
+        case "${scenario}" in
+          invalid-ruleset)
+            printf '%s\n' '{"name":"Protect immutable v* release tags","target":"branch","enforcement":"active","bypass_actors":[],"conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"update"}]}'
+            ;;
+          missing-bypass-actors)
+            printf '%s\n' '{"name":"Protect immutable v* release tags","target":"tag","enforcement":"active","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"update"}]}'
+            ;;
+          null-bypass-actors)
+            printf '%s\n' '{"name":"Protect immutable v* release tags","target":"tag","enforcement":"active","bypass_actors":null,"conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"update"}]}'
+            ;;
+          extra-bypass-actors)
+            printf '%s\n' '{"name":"Protect immutable v* release tags","target":"tag","enforcement":"active","bypass_actors":[{"actor_id":1,"actor_type":"RepositoryRole","bypass_mode":"always"}],"conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"update"}]}'
+            ;;
+          *)
+            printf '%s\n' '{"name":"Protect immutable v* release tags","target":"tag","enforcement":"active","bypass_actors":[],"conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"update"}]}'
+            ;;
+        esac
         ;;
       *) printf 'unsupported gh api endpoint: %s\n' "${endpoint}" >&2; exit 2 ;;
     esac

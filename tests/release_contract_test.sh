@@ -144,7 +144,15 @@ expect_failure dirty-release-checkout \
 
 reset_scenario success Linux x86_64
 "${repository_root}/scripts/check-repository-policy.sh" >/dev/null
-for scenario in immutable-disabled missing-ruleset duplicate-ruleset missing-bypass-actors invalid-ruleset; do
+for scenario in \
+  immutable-disabled \
+  missing-ruleset \
+  duplicate-ruleset \
+  missing-bypass-actors \
+  null-bypass-actors \
+  extra-bypass-actors \
+  invalid-ruleset
+do
   reset_scenario "${scenario}" Linux x86_64
   expect_failure "policy-${scenario}" "${repository_root}/scripts/check-repository-policy.sh"
 done
