@@ -33,7 +33,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          release_commit="$(git rev-parse --verify HEAD^{commit})"
+          release_commit="$(git rev-parse --verify 'HEAD^{commit}')"
           version="$(scripts/check-release-tag.sh "${RELEASE_TAG}" "${release_commit}")"
           upstream_state="$(
             gh release view "${RELEASE_TAG}" \
@@ -45,9 +45,11 @@ jobs:
           upstream_commit="$(
             scripts/resolve-tag.sh gcomfident-crypto/stratadiff "${RELEASE_TAG}"
           )"
-          printf 'commit=%s\n' "${release_commit}" >> "${GITHUB_OUTPUT}"
-          printf 'upstream_commit=%s\n' "${upstream_commit}" >> "${GITHUB_OUTPUT}"
-          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+          {
+            printf 'commit=%s\n' "${release_commit}"
+            printf 'upstream_commit=%s\n' "${upstream_commit}"
+            printf 'version=%s\n' "${version}"
+          } >> "${GITHUB_OUTPUT}"
       - name: Create or validate draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,7 +99,7 @@ jobs:
       - name: Verify checked-out extension commit
         env:
           RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
-        run: test "$(git rev-parse --verify HEAD^{commit})" = "${RELEASE_COMMIT}"
+        run: test "$(git rev-parse --verify 'HEAD^{commit}')" = "${RELEASE_COMMIT}"
       - name: Promote verified upstream bytes
         id: package
         env:
