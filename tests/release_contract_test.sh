@@ -32,6 +32,16 @@ expect_failure() {
   fi
 }
 
+run_release_check_in_directory() {
+  local directory=$1
+  local check_script=$2
+  local expected_commit=$3
+  (
+    cd -- "${directory}"
+    "${check_script}" v0.4.0 "${expected_commit}"
+  )
+}
+
 run_platform_case() {
   local kernel=$1
   local machine=$2
@@ -129,8 +139,8 @@ git -C "${tag_repository}" tag -a v0.4.0 -m v0.4.0
   fail 'valid release tag was rejected'
 printf 'dirty\n' > "${tag_repository}/untracked"
 expect_failure dirty-release-checkout \
-  bash -c 'cd -- "$1" && "$2" v0.4.0 "$3"' bash \
-  "${tag_repository}" "${repository_root}/scripts/check-release-tag.sh" "${tag_commit}"
+  run_release_check_in_directory "${tag_repository}" \
+  "${repository_root}/scripts/check-release-tag.sh" "${tag_commit}"
 
 reset_scenario success Linux x86_64
 "${repository_root}/scripts/check-repository-policy.sh" >/dev/null

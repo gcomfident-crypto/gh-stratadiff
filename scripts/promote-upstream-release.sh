@@ -86,7 +86,7 @@ gh api --hostname "${github_host}" \
   > "${installer}"
 [[ -f "${installer}" && ! -L "${installer}" && -s "${installer}" ]] || \
   die 'upstream installer is not a nonempty regular file'
-installer_size="$(wc -c < "${installer}")"
+read -r installer_size < <(wc -c < "${installer}")
 [[ "${installer_size}" =~ ^[0-9]+$ && "${installer_size}" -le 1048576 ]] || \
   die 'upstream installer exceeds the 1 MiB safety limit'
 bash -n "${installer}" || die 'upstream installer is not valid Bash'
