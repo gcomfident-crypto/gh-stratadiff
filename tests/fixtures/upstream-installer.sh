@@ -42,6 +42,10 @@ fi
   printf 'scenario=%q\n' "${GH_STRATADIFF_TEST_SCENARIO}"
   printf '%s\n' 'case "${1:-}" in'
   printf '%s\n' '  --version) printf "stratadiff %s\\n" "${reported_version}" ;;'
+  printf '%s\n' '  doctor)'
+  printf '%s\n' '    [[ "${scenario}" != missing-doctor ]] || exit 2'
+  printf '%s\n' '    [[ "${2:-}" == --help ]] && printf "Doctor help\\n"'
+  printf '%s\n' '    ;;'
   printf '%s\n' '  inbox)'
   printf '%s\n' '    [[ "${scenario}" != missing-inbox ]] || exit 2'
   printf '%s\n' '    [[ "${2:-}" == --help ]] && printf "Inbox help\\n"'

@@ -1,8 +1,8 @@
 # Release procedure
 
 The extension version must be identical to a published immutable upstream StrataDiff version. The
-upstream release must provide working `inbox` and `resume` commands before this repository is
-tagged.
+upstream release must provide working `doctor`, `inbox`, and `resume` commands before this
+repository is tagged.
 
 ## One-time repository controls
 
@@ -37,7 +37,7 @@ Use the actual upstream version instead of copying the example. The release work
 1. resolves both annotated tags to immutable commits;
 2. rejects a draft, prerelease, mutable, or differently versioned upstream release;
 3. runs the upstream release's own verified installer on native Linux/macOS x86-64/ARM64 runners;
-4. proves `inbox` and `resume` exist before packaging;
+4. proves `doctor`, `inbox`, and `resume` exist before packaging;
 5. creates checksums and GitHub build-provenance bundles for the renamed extension assets;
 6. validates the exact twelve-file draft inventory and every attestation;
 7. revalidates both tags and the upstream release immediately before publication;

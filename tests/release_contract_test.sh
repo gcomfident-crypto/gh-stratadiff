@@ -52,6 +52,7 @@ run_platform_case() {
   [[ -x "${output}/${asset}" ]] || fail "${asset} was not executable"
   [[ "$("${output}/${asset}" --version)" == 'stratadiff 0.4.0' ]] || \
     fail "${asset} reports the wrong version"
+  "${output}/${asset}" doctor --help >/dev/null || fail "${asset} lacks doctor"
   "${output}/${asset}" inbox --help >/dev/null || fail "${asset} lacks inbox"
   "${output}/${asset}" resume --help >/dev/null || fail "${asset} lacks resume"
   checksum_line="$(< "${output}/${asset}.sha256")"
@@ -108,7 +109,7 @@ if grep -F '/contents/scripts/install-release.sh' "${GH_STRATADIFF_TEST_LOG}" >/
 fi
 
 for scenario in draft-release prerelease invalid-tag-object empty-installer installer-failure \
-  version-mismatch missing-inbox tag-drift; do
+  version-mismatch missing-doctor missing-inbox tag-drift; do
   reset_scenario "${scenario}" Linux x86_64
   output=${temporary_directory}/${scenario}
   expect_failure "${scenario}" \

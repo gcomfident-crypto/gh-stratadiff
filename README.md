@@ -14,6 +14,21 @@ checkpoint. `resume` binds that checkpoint to exact Git objects and opens the lo
 Workbench. When the evidence cannot justify carrying review coverage forward, StrataDiff exposes
 the uncertainty instead of hiding code.
 
+## Pull Request Doctor in `v0.5.0`
+
+The upcoming `v0.5.0` release adds a read-only incident path for a pull request blocked by required
+checks:
+
+```console
+gh stratadiff doctor https://github.com/OWNER/REPOSITORY/pull/123
+```
+
+Doctor binds the report to GitHub's selected PR-head, test-merge, or merge-queue candidate and
+distinguishes missing, pending, failed, wrong-App, and unknown required-check evidence. It returns
+the smallest evidence-backed next action without claiming that the pull request is otherwise
+mergeable. The latest published extension is still `v0.4.1`, which does not contain Doctor; use the
+command above only after matching immutable `v0.5.0` releases are published here and upstream.
+
 This repository is the precompiled GitHub CLI distribution surface for
 [`gcomfident-crypto/stratadiff`](https://github.com/gcomfident-crypto/stratadiff). It does not
 contain a second implementation of the review engine.
@@ -59,8 +74,8 @@ gh stratadiff resume https://github.com/OWNER/REPOSITORY/pull/123
 ```
 
 Use `--repo-dir PATH` to reuse a local object store, or `--no-open` to print the Workbench URL.
-Run `gh stratadiff inbox --help` and `gh stratadiff resume --help` for the complete native command
-contract.
+After `v0.5.0` is published, run `gh stratadiff doctor --help` for its complete contract. Run
+`gh stratadiff inbox --help` and `gh stratadiff resume --help` for the commands available today.
 
 ## Versions and upgrades
 
@@ -98,10 +113,10 @@ attestation, checks the binary version, and resolves the tag both before and aft
 
 Only then does this repository rename the exact bytes, create a new checksum, generate a build
 provenance attestation for the extension workflow, verify the complete twelve-file inventory, and
-publish its own immutable release. A clean-install matrix exercises installation, `inbox`, and
-`resume` on all four platforms after publication. Starting with the second extension release, it
-also installs the preceding immutable version and exercises the real `gh extension upgrade`
-transition.
+publish its own immutable release. A clean-install matrix exercises installation, `doctor`,
+`inbox`, and `resume` on all four platforms after publication. Starting with the second extension
+release, it also installs the preceding immutable version and exercises the real
+`gh extension upgrade` transition.
 
 GitHub CLI selects and downloads a matching third-party extension asset, but `gh extension install`
 does not itself consume the adjacent checksum or provenance bundle. To independently inspect a

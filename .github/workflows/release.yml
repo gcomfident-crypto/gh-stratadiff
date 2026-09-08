@@ -243,6 +243,7 @@ jobs:
         run: |
           gh extension install "${GITHUB_REPOSITORY}"
           test "$(gh stratadiff --version)" = "stratadiff ${RELEASE_VERSION}"
+          gh stratadiff doctor --help >/dev/null
           gh stratadiff inbox --help >/dev/null
           gh stratadiff resume --help >/dev/null
           gh extension remove stratadiff
@@ -273,5 +274,6 @@ jobs:
           test "$(gh stratadiff --version)" = "stratadiff ${previous_tag#v}"
           gh extension upgrade stratadiff --force
           test "$(gh stratadiff --version)" = "stratadiff ${RELEASE_VERSION}"
+          gh stratadiff doctor --help >/dev/null
           gh stratadiff inbox --help >/dev/null
           gh stratadiff resume --help >/dev/null

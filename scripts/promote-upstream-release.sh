@@ -103,6 +103,8 @@ expected_version=${release_tag#v}
 reported_version="$("${upstream_binary}" --version)"
 [[ "${reported_version}" == "stratadiff ${expected_version}" ]] || \
   die "upstream binary reports ${reported_version}, expected stratadiff ${expected_version}"
+"${upstream_binary}" doctor --help >/dev/null || \
+  die "upstream ${release_tag} does not provide the doctor command"
 "${upstream_binary}" inbox --help >/dev/null || \
   die "upstream ${release_tag} does not provide the inbox command"
 "${upstream_binary}" resume --help >/dev/null || \
